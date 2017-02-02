@@ -1,4 +1,4 @@
-package com.radix.test.cmake.xdebug
+
 
 import com.radix.cmake.xdebug.CMakeDebuggerListener
 import com.radix.cmake.xdebug.CMakeDebuggerProxy
