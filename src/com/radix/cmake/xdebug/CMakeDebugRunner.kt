@@ -39,7 +39,7 @@ class CMakeDebugRunner() : GenericProgramRunner <RunnerSettings>() {
         val runConfig = antRunCommandLineState.environment.runProfile as CMakeRunConfiguration
         val debugPort = runConfig.getDebugPort()
         val serverProcessHandler = CMakeProcessFactory(debugPort).createProcess(runConfig)
-        val debuggerProxy = CMakeDebuggerProxy(project, debugPort)
+        val debuggerProxy = CMakeDebuggerProxy(debugPort)
 
         val session = XDebuggerManager.getInstance(project).startSession(environment,
                 object : XDebugProcessStarter() {
