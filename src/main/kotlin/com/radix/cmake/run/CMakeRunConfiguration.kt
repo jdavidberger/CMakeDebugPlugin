@@ -13,19 +13,20 @@ import com.intellij.openapi.project.Project
 
 class CMakeRunConfiguration(project: Project, factory: CMakeRunConfigurationFactory, s: String) :
         ModuleBasedConfiguration<RunConfigurationModule>(s, RunConfigurationModule(project), factory) {
+
+    var cmakePath = "cmake"
+    var port = 8080
+    var workingDir = ""
+    var sourceDir = ""
+
     override fun getValidModules(): MutableCollection<Module> {
         return mutableListOf(ModuleManager.getInstance(project).modules[0])
     }
 
-    override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> {
-        return CMakeRunSettingsEditor(getConfigurationModule().getProject())
-    }
+    override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> = CMakeRunSettingsEditor(configurationModule.project, this)
 
     override fun getState(p0: Executor, executionEnvironment: ExecutionEnvironment): RunProfileState? {
-        return CMakeRunCommandLineState(executionEnvironment, this);
+        return CMakeRunCommandLineState(executionEnvironment, this)
     }
 
-    fun  getDebugPort(): Int {
-        return 8080
-    }
 }

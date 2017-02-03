@@ -21,7 +21,7 @@ class CMakeConfigType :ConfigurationType {
     }
 
     override fun getDisplayName(): String {
-        return "CMake";
+        return "CMake"
     }
 
     private val myFactory: ConfigurationFactory = CMakeRunConfigurationFactory(this)

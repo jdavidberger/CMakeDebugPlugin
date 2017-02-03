@@ -6,23 +6,16 @@ import com.intellij.execution.process.ProcessTerminatedListener
 import com.radix.cmake.run.CMakeRunConfiguration
 import com.intellij.execution.configurations.GeneralCommandLine
 
-class CMakeProcessFactory(debugPort: Int) {
-    private var port : Int = 8080
-    init {
-        port = debugPort
-    }
-    constructor() : this(8080) {
-
-    }
+class CMakeProcessFactory {
 
     fun create(config : CMakeRunConfiguration) : GeneralCommandLine {
         val result = GeneralCommandLine()
 
-        result.exePath = "C:/Users/J/CLionProjects/CMake/build2015/bin/Debug/cmake.exe"
+        result.exePath = config.cmakePath
 
-        result.setWorkDirectory(config.project.baseDir.path)
-        result.addParameter("--debugger=" + config.getDebugPort())
-        result.addParameter(config.project.baseDir.path)
+        result.setWorkDirectory(config.workingDir)
+        result.addParameter("--debugger=" + config.port)
+        result.addParameter( if(config.sourceDir.isEmpty()) config.project.baseDir.path else config.sourceDir)
         return result
     }
 

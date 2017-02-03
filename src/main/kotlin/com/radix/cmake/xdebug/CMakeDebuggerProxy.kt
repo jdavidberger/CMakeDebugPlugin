@@ -67,26 +67,31 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
         client.register(this.selector, SelectionKey.OP_READ)
 
         while (true) {
-            // wait for events
-            this.selector.select()
+            try {
 
-            //work on selected keys
-            val keys = this.selector.selectedKeys().iterator()
-            while (keys.hasNext()) {
-                val key = keys.next()
+                // wait for events
+                this.selector.select()
 
-                // this is necessary to prevent the same key from coming up
-                // again the next time around.
-                // keys.remove()
+                //work on selected keys
+                val keys = this.selector.selectedKeys().iterator()
+                while (keys.hasNext()) {
+                    val key = keys.next()
 
-                if (!key.isValid) {
-                    continue
+                    // this is necessary to prevent the same key from coming up
+                    // again the next time around.
+                    // keys.remove()
+
+                    if (!key.isValid) {
+                        continue
+                    }
+
+                    if (key.isReadable) {
+                        this.read(key)
+                    }
+
                 }
-
-                if (key.isReadable) {
-                    this.read(key)
-                }
-
+            } catch(e: Exception) {
+                println(e)
             }
         }
     }
@@ -114,15 +119,14 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
         if(json.isJsonObject) {
 
             var obj = json.asJsonObject!!
-            if(obj["State"].isJsonPrimitive()) {
+            if(obj["State"] != null && obj["State"].isJsonPrimitive()) {
                 computeStackFromJson(obj)
                 OnStateChange(obj["State"].asString, obj["File"].asString, obj["Line"].asInt - 1)
             }
-
-            if(obj["Request"].isJsonPrimitive()) {
+            else if(obj["Request"] != null && obj["Request"].isJsonPrimitive()) {
                 if(evalCallbacks[ obj["Request"].asString ] != null) {
                     if (obj["Response"].isJsonPrimitive)
-                        evalCallbacks[obj["Request"].asString]?.evaluated(CMakeValue(this, obj["Response"]))
+                        evalCallbacks[obj["Request"].asString]?.evaluated(CMakeValue(this, obj["Response"].asString))
                     else
                         evalCallbacks[obj["Request"].asString]?.errorOccurred("Expression doesn't evaluate.")
                     evalCallbacks.remove(obj["Request"].asString)
@@ -133,13 +137,13 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
     }
 
     private fun  computeStackFromJson(obj: JsonObject) {
-        var stack = ArrayList<SourceFilePosition>()
+        var stack = ArrayList<CMakeStackFrame>()
         var bt = obj["Backtrace"]
         if(bt != null && bt.isJsonArray) {
             var arr = bt.asJsonArray
             for (i in arr) {
                 val item = i.asJsonObject
-                stack.add(SourceFilePosition(  item["Line"].asInt - 1, item["File"].asString))
+                stack.add(CMakeStackFrame(this, SourceFilePosition(  item["Line"].asInt - 1, item["File"].asString), item["Name"].asString))
             }
             this.stack = CMakeExecutionStack(this, stack)
         }
@@ -171,10 +175,14 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
         sendCommand("Break")
     }
 
-    private fun sendCommand(cmd : Map<String, out String>) {
+    private fun sendCommand(cmd : Map<String, out Any>) {
         var obj = JsonObject()
         for(k in cmd)
-            obj.addProperty(k.key, k.value)
+            if(k.value is Int)
+                obj.addProperty(k.key, k.value as Int)
+            else if(k.value is String)
+                obj.addProperty(k.key, k.value as String)
+
         sendString(obj.toString())
     }
     private fun sendString(cmd: String) {
@@ -208,13 +216,13 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
     fun  removeBreakPoint(sourceFile: SourceFilePosition) {
         sendCommand( mapOf("Command" to "RemoveBreakpoint",
                 "File" to sourceFile.File,
-                "Line" to sourceFile.myLine.toString()
+                "Line" to (sourceFile.myLine + 1)
         ) )
     }
     fun  addBreakPoint(sourceFile: SourceFilePosition) {
         sendCommand( mapOf("Command" to "AddBreakpoint",
                 "File" to sourceFile.File,
-                "Line" to sourceFile.myLine.toString()
+                "Line" to (sourceFile.myLine + 1)
                 ) )
     }
 
@@ -222,10 +230,21 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
         evalCallbacks[str] = cb
         sendCommand( mapOf("Command" to "Evaluate", "Request" to str))
     }
+
+    fun stepOut() {
+        sendCommand( "StepOut" )
+    }
+    fun stepInto() {
+        sendCommand( "StepIn" )
+    }
+    fun stepOver() {
+        sendCommand( "StepOver" )
+    }
 }
 
-class CMakeValue(debugger: CMakeDebuggerProxy, jsonElement: JsonElement?) : XValue() {
+class CMakeValue(debugger: CMakeDebuggerProxy, v: String) : XValue() {
+    var value = v
     override fun computePresentation(node: XValueNode, place: XValuePlace) {
-        node.setPresentation(null, "String",  "", false)
+        node.setPresentation(null, "",  value, false)
     }
 }

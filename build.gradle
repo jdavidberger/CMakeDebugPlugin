@@ -6,9 +6,35 @@
  * user guide available at https://docs.gradle.org/3.3/userguide/tutorial_java_projects.html
  */
 
+buildscript {
+    ext.kotlin_version = '1.0.6'
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+plugins {
+    id "org.jetbrains.intellij" version "0.1.10"
+}
+
 // Apply the java plugin to add support for Java
 apply plugin: 'java'
 apply plugin: 'kotlin'
+apply plugin: 'idea'
+apply plugin: 'org.jetbrains.intellij'
+
+
+group 'org.jetbrains'
+version '1.2' // Plugin version
+
+intellij {
+    version 'IC-2016.3' //IntelliJ IDEA 2016.3 dependency; for a full list of IntelliJ IDEA releases please see https://www.jetbrains.com/intellij-repository/releases
+    plugins 'coverage' //Bundled plugin dependencies
+    pluginName 'CMakeDebugPlugin'
+}
 
 // In this section you declare where to find the dependencies of your project
 repositories {
@@ -26,15 +52,7 @@ dependencies {
     testCompile 'junit:junit:4.12'
     compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 }
-buildscript {
-    ext.kotlin_version = '1.0.6'
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-    }
-}
+
 sourceSets {
     main.java.srcDirs += 'src/main/kotlin'
 }

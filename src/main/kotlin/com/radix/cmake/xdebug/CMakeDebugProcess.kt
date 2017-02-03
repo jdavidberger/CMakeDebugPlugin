@@ -90,6 +90,18 @@ class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
         proxy.pause();
     }
 
+    override fun startStepOver() {
+        proxy.stepOver()
+    }
+
+    override fun startStepOut() {
+        proxy.stepOut()
+    }
+
+    override fun startStepInto() {
+        proxy.stepInto()
+    }
+
     fun  removeBreakPoint(sourceFile: SourceFilePosition) {
         proxy.removeBreakPoint(sourceFile)
     }
@@ -121,7 +133,7 @@ class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
 
 
 class SourceFilePosition() : XSourcePosition {
-    var myLine = 0
+    var myLine : Int = 0
     var File = ""
 
     init {}
@@ -145,7 +157,7 @@ class SourceFilePosition() : XSourcePosition {
     }
 
     override fun getOffset(): Int {
-        return 0
+        return -1
     }
 
     override fun getLine(): Int {
