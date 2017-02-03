@@ -1,10 +1,16 @@
 package com.radix.cmake.xdebug
 
 import com.fasterxml.jackson.core.JsonFactory
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.intellij.execution.process.OSProcessHandler
 import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.xdebugger.XSourcePosition
+import com.intellij.xdebugger.evaluation.XDebuggerEvaluator
+import com.intellij.xdebugger.frame.XValue
+import com.intellij.xdebugger.frame.XValueNode
+import com.intellij.xdebugger.frame.XValuePlace
 import org.apache.http.entity.mime.MIME.UTF8_CHARSET
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
@@ -40,8 +46,9 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
     private val myPort: Int = debugPort
     val hostAddress = InetSocketAddress("localhost", myPort)
     val client = SocketChannel.open(hostAddress)
-    var stack = CMakeExecutionStack()
+    var stack = CMakeExecutionStack(this)
     val jsonFactory = JsonFactory()
+    var evalCallbacks = HashMap<String, XDebuggerEvaluator.XEvaluationCallback>()
 
     fun GetLastBacktrace() : CMakeExecutionStack {
         return stack
@@ -99,13 +106,28 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
     }
 
     private fun processMessage(readBuffer: String) {
+        println("New message: " + readBuffer)
+
+
         var parser = JsonParser()
         var json = parser.parse(readBuffer)
         if(json.isJsonObject) {
+
             var obj = json.asJsonObject!!
             if(obj["State"].isJsonPrimitive()) {
                 computeStackFromJson(obj)
                 OnStateChange(obj["State"].asString, obj["File"].asString, obj["Line"].asInt - 1)
+            }
+
+            if(obj["Request"].isJsonPrimitive()) {
+                if(evalCallbacks[ obj["Request"].asString ] != null) {
+                    if (obj["Response"].isJsonPrimitive)
+                        evalCallbacks[obj["Request"].asString]?.evaluated(CMakeValue(this, obj["Response"]))
+                    else
+                        evalCallbacks[obj["Request"].asString]?.errorOccurred("Expression doesn't evaluate.")
+                    evalCallbacks.remove(obj["Request"].asString)
+                }
+
             }
         }
     }
@@ -119,7 +141,7 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
                 val item = i.asJsonObject
                 stack.add(SourceFilePosition(  item["Line"].asInt - 1, item["File"].asString))
             }
-            this.stack = CMakeExecutionStack(stack)
+            this.stack = CMakeExecutionStack(this, stack)
         }
     }
 
@@ -153,7 +175,7 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
         var obj = JsonObject()
         for(k in cmd)
             obj.addProperty(k.key, k.value)
-        sendCommand(obj.toString())
+        sendString(obj.toString())
     }
     private fun sendString(cmd: String) {
         client.write(ByteBuffer.wrap(cmd.toByteArray(Charset.forName("UTF-8"))))
@@ -194,5 +216,16 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
                 "File" to sourceFile.File,
                 "Line" to sourceFile.myLine.toString()
                 ) )
+    }
+
+    fun  evaluate(str: String, cb: XDebuggerEvaluator.XEvaluationCallback, location: XSourcePosition?) {
+        evalCallbacks[str] = cb
+        sendCommand( mapOf("Command" to "Evaluate", "Request" to str))
+    }
+}
+
+class CMakeValue(debugger: CMakeDebuggerProxy, jsonElement: JsonElement?) : XValue() {
+    override fun computePresentation(node: XValueNode, place: XValuePlace) {
+        node.setPresentation(null, "String",  "", false)
     }
 }
