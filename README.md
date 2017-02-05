@@ -1,8 +1,22 @@
 # CMakeDebugPlugin
 
-## Environment Setup
+## Environment Setup for source build
 
 1. Install [jdk](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html), add to path, set $JAVA_HOME env var
 1. Download [gradle binaries](https://gradle.org/gradle-download/), add to path
 1. Run `gradle build`, observe success
 1. Run `gradle runIdea` to launch a sand box Intellij IDE
+
+## Installation from zip
+
+Go into 'Settings' -> 'Plugins' -> 'Install plugin from disk...' and find the plugin zip file. This will require a restart of the IDE. 
+
+## Usage
+
+After installation, go into 'Edit Configurations', click the '+' button in the top left and add the 'CMake' application type (you might have to click to show more options in the dropdown). 
+
+On the configuration panel, only modify the port if you have a conflict with something else running on your system. 
+
+Modify the 'CMake Installation' option to point to a version of CMake with the integrated debugger. You can get binaries [here](https://github.com/jdavidberger/CMake/releases). You can build from source from [here](https://github.com/jdavidberger/CMake/tree/debugger). If you don't do this, the plugin will crash.
+
+You can set the build and source directory to wherever the project you want to build is. If you leave them empty, you'll get reasonable defaults -- the source directory will be the project root, and the build directory will be a build folder hanging off of that folder. 
