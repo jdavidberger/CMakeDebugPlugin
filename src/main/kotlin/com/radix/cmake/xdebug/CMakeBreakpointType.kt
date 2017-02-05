@@ -8,11 +8,9 @@ import com.intellij.openapi.vfs.VirtualFile
 
 
 class CMakeBreakpointType : XLineBreakpointType<XBreakpointProperties<*>>("cmake-line", "CMake breakpoints") {
-    override fun createBreakpointProperties(virtualFile: VirtualFile, i: Int): XBreakpointProperties<*>? {
-        return null
-    }
+    override fun createBreakpointProperties(virtualFile: VirtualFile, i: Int): XBreakpointProperties<*>? =
+            null
 
-    override fun canPutAt(file: VirtualFile, line: Int, project: Project): Boolean {
-        return "cmake" == file.extension || "CMakeLists.txt" == file.name
-    }
+    override fun canPutAt(file: VirtualFile, line: Int, project: Project): Boolean =
+            "cmake" == file.extension || "CMakeLists.txt" == file.name
 }

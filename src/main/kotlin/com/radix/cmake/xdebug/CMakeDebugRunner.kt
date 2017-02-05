@@ -13,8 +13,8 @@ import com.intellij.xdebugger.XDebugProcess
 import com.intellij.xdebugger.XDebugProcessStarter
 import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.XDebuggerManager
-import com.radix.cmake.run.CMakeRunCommandLineState
-import com.radix.cmake.run.CMakeRunConfiguration
+import com.radix.cmake.config.CMakeRunCommandLineState
+import com.radix.cmake.config.CMakeRunConfiguration
 import org.jetbrains.annotations.NotNull
 
 
@@ -27,16 +27,12 @@ class CMakeDebugRunner() : GenericProgramRunner <RunnerSettings>() {
         return "CMakeDebugRunner"
     }
 
-    override fun onProcessStarted(settings: RunnerSettings?, executionResult: ExecutionResult?) {
-        super.onProcessStarted(settings, executionResult)
-    }
-
     override fun doExecute(project: Project, state: RunProfileState, contentToReuse: RunContentDescriptor?,
                            environment: ExecutionEnvironment): RunContentDescriptor? {
         FileDocumentManager.getInstance().saveAllDocuments()
 
-        val antRunCommandLineState = state as CMakeRunCommandLineState
-        val runConfig = antRunCommandLineState.environment.runProfile as CMakeRunConfiguration
+        val runCommandLineState = state as CMakeRunCommandLineState
+        val runConfig = runCommandLineState.environment.runProfile as CMakeRunConfiguration
         val debugPort = runConfig.port
         val serverProcessHandler = CMakeProcessFactory().createProcess(runConfig)
         val debuggerProxy = CMakeDebuggerProxy(debugPort)

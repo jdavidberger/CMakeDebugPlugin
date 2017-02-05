@@ -1,4 +1,4 @@
-package com.radix.cmake;
+package com.radix.cmake.config;
 
 import javax.swing.*;
 

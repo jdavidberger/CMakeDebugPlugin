@@ -3,7 +3,7 @@ package com.radix.cmake.xdebug
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.process.OSProcessHandler
 import com.intellij.execution.process.ProcessTerminatedListener
-import com.radix.cmake.run.CMakeRunConfiguration
+import com.radix.cmake.config.CMakeRunConfiguration
 import com.intellij.execution.configurations.GeneralCommandLine
 
 class CMakeProcessFactory {

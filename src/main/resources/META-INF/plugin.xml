@@ -1,6 +1,6 @@
 <idea-plugin version="2">
   <id>com.your.company.unique.plugin.id</id>
-  <name>Plugin display name here</name>
+  <name>CMake Debugger</name>
   <version>1.0</version>
   <vendor email="j.david.berger@gmail.com" url="http://www.yourcompany.com">Radix Mons</vendor>
 
@@ -8,7 +8,8 @@
       This plug-in allows you to debug cmake scripts
     ]]></description>
 
-  <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
+  <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number
+  _ranges.html for description -->
   <idea-version since-build="145.0"/>
 
   <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html
@@ -16,7 +17,7 @@
   <depends>com.intellij.modules.lang</depends>
 
   <extensions defaultExtensionNs="com.intellij">
-    <configurationType implementation="com.radix.cmake.run.CMakeConfigType"/>
+    <configurationType implementation="com.radix.cmake.config.CMakeConfigType"/>
 
     <xdebugger.breakpointType implementation="com.radix.cmake.xdebug.CMakeBreakpointType"/>
 

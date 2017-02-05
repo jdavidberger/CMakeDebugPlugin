@@ -2,33 +2,28 @@ package com.radix.cmake.xdebug
 
 import com.intellij.execution.filters.TextConsoleBuilderFactory
 import com.intellij.execution.process.OSProcessHandler
+import com.intellij.execution.process.ProcessEvent
+import com.intellij.execution.process.ProcessHandler
+import com.intellij.execution.process.ProcessListener
 import com.intellij.execution.ui.ExecutionConsole
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
-import com.intellij.openapi.util.io.FileUtil
-import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.pom.Navigatable
+import com.intellij.openapi.util.Key
 import com.intellij.xdebugger.XDebugProcess
 import com.intellij.xdebugger.XDebugSession
-import com.intellij.xdebugger.XSourcePosition
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler
-import com.intellij.xdebugger.breakpoints.XBreakpointProperties
-import com.intellij.xdebugger.breakpoints.XLineBreakpoint
 import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider
 import com.intellij.xdebugger.frame.XSuspendContext
-import com.radix.cmake.run.CMakeRunCommandLineState
+import com.radix.cmake.config.CMakeRunCommandLineState
 import javax.swing.SwingUtilities.invokeLater
-import com.intellij.openapi.vfs.VirtualFileManager
-
-
 
 
 class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
                         serverProcessHandler: OSProcessHandler,
-                        proxy : CMakeDebuggerProxy) : XDebugProcess(session), CMakeDebuggerListener {
+                        proxy : CMakeDebuggerProxy) : XDebugProcess(session), CMakeDebuggerListener, ProcessListener {
+
 
     private val serverProcessHandler = serverProcessHandler
     val proxy = proxy
@@ -36,10 +31,10 @@ class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
 
     init {
         proxy.AddListener(this)
+        serverProcessHandler.addProcessListener(this)
     }
-    override fun getEditorsProvider(): XDebuggerEditorsProvider {
-        return CMakeDebuggerEditorsProvider()
-    }
+
+    override fun getEditorsProvider(): XDebuggerEditorsProvider = CMakeDebuggerEditorsProvider()
 
     override fun sessionInitialized() {
         super.sessionInitialized()
@@ -52,12 +47,12 @@ class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
                 try {
                     proxy.connect(indicator, serverProcessHandler, 60)
 
-                    if (proxy.isReady()) {
-                        //proxy.attach(myLineBreakpointHandler.myBreakpointByPosition. )
-                    } else {
+                    if (!proxy.isReady()) {
                         terminateDebug(null)
                     }
 
+                    indicator.text = "Connected"
+                    indicator.isIndeterminate = false
                 } catch (e: Exception) {
                     terminateDebug(e.message)
                 }
@@ -66,13 +61,22 @@ class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
         })
     }
 
+    override fun doGetProcessHandler(): ProcessHandler? = serverProcessHandler
+
+    override fun stop() {
+        super.stop()
+        processHandler.destroyProcess()
+        proxy.shutdown()
+    }
+
     private fun terminateDebug(msg: String?) {
         processHandler.destroyProcess()
         invokeLater({
             val text = "Debugger can't connect to CMake"
-            Messages.showErrorDialog(if (msg != null) text + ":\r\n" + msg else text, "Ant debugger")
+            Messages.showErrorDialog(if (msg != null) text + ":\r\n" + msg else text, "CMake debugger")
         })
     }
+
     override fun createConsole(): ExecutionConsole {
         val consoleBuilder = TextConsoleBuilderFactory.getInstance().createBuilder(session.project)
 
@@ -82,118 +86,53 @@ class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
         return console
     }
 
-    override fun resume(context: XSuspendContext?) {
-        proxy.resume()
-    }
+    override fun resume(context: XSuspendContext?) = proxy.resume()
+    override fun startPausing() = proxy.pause()
+    override fun startStepOver(context: XSuspendContext?) = proxy.stepOver()
+    override fun startStepOut(context: XSuspendContext?) = proxy.stepOut()
+    override fun startStepInto(context: XSuspendContext?) = proxy.stepInto()
 
-    override fun startPausing() {
-        proxy.pause();
-    }
+    fun removeBreakPoint(sourceFile: SourceFilePosition) = proxy.removeBreakPoint(sourceFile)
+    fun addBreakPoint(sourceFile: SourceFilePosition) = proxy.addBreakPoint(sourceFile)
 
-    override fun startStepOver() {
-        proxy.stepOver()
-    }
+    override fun getBreakpointHandlers(): Array<out XBreakpointHandler<*>> =
+            arrayOf<XBreakpointHandler<*>>(myLineBreakpointHandler)
 
-    override fun startStepOut() {
-        proxy.stepOut()
-    }
-
-    override fun startStepInto() {
-        proxy.stepInto()
-    }
-
-    fun  removeBreakPoint(sourceFile: SourceFilePosition) {
-        proxy.removeBreakPoint(sourceFile)
-    }
-    fun  addBreakPoint(sourceFile: SourceFilePosition) {
-        proxy.addBreakPoint(sourceFile)
-    }
-
-    override fun getBreakpointHandlers(): Array<out XBreakpointHandler<*>> {
-        return arrayOf<XBreakpointHandler<*>>(myLineBreakpointHandler)
-    }
     override fun OnStateChange(newState: String, file: String, line: Int) {
-        var bp = SourceFilePosition(line, file)
-        var xBreakpoint = myLineBreakpointHandler.myBreakpointByPosition[bp]
+        val bp = SourceFilePosition(line, file)
+        val xBreakpoint = myLineBreakpointHandler.myBreakpointByPosition[bp]
 
-        var ctx = CMakeSuspendContext(session.project, this)
+        val ctx = CMakeSuspendContext(session.project, this)
         when(newState) {
             "Paused" -> {
                 if(xBreakpoint != null)
-                    session.breakpointReached(xBreakpoint!!,"", ctx)
+                    session.breakpointReached(xBreakpoint,"", ctx)
                 else
                     session.positionReached(ctx)
             }
             "Running" -> {
-                session.resume()
+                session.sessionResumed()
             }
         }
     }
-}
 
+    override fun onTextAvailable(event: ProcessEvent?, outputType: Key<*>?) {
 
-class SourceFilePosition() : XSourcePosition {
-    var myLine : Int = 0
-    var File = ""
-
-    init {}
-
-    private val FILE_URL_PREFIX = "file:///"
-    fun findFile(path: String): VirtualFile? {
-        var path = path
-        if (path == null || "" == path) {
-            return null
-        }
-
-        if (!path.startsWith(FILE_URL_PREFIX)) {
-            path = FILE_URL_PREFIX + path
-        }
-
-        return VirtualFileManager.getInstance().findFileByUrl(path)
     }
 
-    override fun getFile(): VirtualFile {
-        return findFile(File)!!
+    override fun processTerminated(event: ProcessEvent?) {
+        processHandler.destroyProcess()
+        proxy.shutdown()
+        session.stop()
     }
 
-    override fun getOffset(): Int {
-        return -1
+    override fun processWillTerminate(event: ProcessEvent?, willBeDestroyed: Boolean) {
+
     }
 
-    override fun getLine(): Int {
-        return myLine
-    }
+    override fun startNotified(event: ProcessEvent?) {
 
-    class NavImpl(p0 : Project, _file : VirtualFile, _line : Int) : Navigatable {
-        var project = p0
-        var file = _file
-        var line = _line
-
-        override fun navigate(requestFocus: Boolean) {
-            com.intellij.openapi.fileEditor.OpenFileDescriptor(project, file, line, 0)
-        }
-
-        override fun canNavigate(): Boolean {
-            return true
-        }
-
-        override fun canNavigateToSource(): Boolean {
-            return true
-        }
-    }
-
-    override fun createNavigatable(p0: Project): Navigatable {
-        return NavImpl(p0, file, line)
-    }
-
-    constructor(line: Int, file: String) : this() {
-        myLine = line
-        File = file
-    }
-
-    constructor(loc: XLineBreakpoint<XBreakpointProperties<*>>) : this() {
-        myLine = loc.line
-        File = loc.presentableFilePath
     }
 }
+
 

@@ -1,17 +1,14 @@
 package com.radix.cmake.xdebug
 
 import com.fasterxml.jackson.core.JsonFactory
-import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.intellij.execution.process.OSProcessHandler
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.xdebugger.XSourcePosition
 import com.intellij.xdebugger.evaluation.XDebuggerEvaluator
-import com.intellij.xdebugger.frame.XValue
-import com.intellij.xdebugger.frame.XValueNode
-import com.intellij.xdebugger.frame.XValuePlace
 import org.apache.http.entity.mime.MIME.UTF8_CHARSET
+import org.bouncycastle.crypto.tls.ConnectionEnd.client
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.SelectionKey
@@ -21,52 +18,57 @@ import java.nio.charset.Charset
 import java.util.*
 
 
-interface CMakeDebuggerListener {
-    fun OnStateChange(newState: String, file: String, line: Int)
-}
-
-open class CMakeDebuggerListenerHub : CMakeDebuggerListener {
-    var listeners = ArrayList<CMakeDebuggerListener>()
-
-    fun AddListener(listener : CMakeDebuggerListener) {
-        listeners.add(listener)
-    }
-
-    override fun OnStateChange(newState: String, file: String, line: Int) {
-        for (obj in listeners) {
-            obj.OnStateChange(newState, file, line)
-        }
-    }
-
-}
-
 class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
     private val selector = Selector.open()
-    //private val myProject: Project = project
     private val myPort: Int = debugPort
-    val hostAddress = InetSocketAddress("localhost", myPort)
-    val client = SocketChannel.open(hostAddress)
-    var stack = CMakeExecutionStack(this)
-    val jsonFactory = JsonFactory()
-    var evalCallbacks = HashMap<String, XDebuggerEvaluator.XEvaluationCallback>()
+    private val hostAddress = InetSocketAddress("localhost", myPort)
+    private var _client: SocketChannel? = null
 
-    fun GetLastBacktrace() : CMakeExecutionStack {
-        return stack
+    fun getClient() : SocketChannel {
+        initClient()
+        return _client!!
     }
+    private var stack = CMakeExecutionStack(this)
+    private val jsonFactory = JsonFactory()
+    private var evalCallbacks = HashMap<String, XDebuggerEvaluator.XEvaluationCallback>()
+    private var isRunning = true
 
-    fun startClientThread() {
+    fun GetLastBacktrace() : CMakeExecutionStack =
+            stack
+
+
+    fun startClientThread() : Boolean {
+        if(!initClient())
+            return false
         val t = object : Thread() {
             override fun run() {
                 startClient()
             }
         }
         t.start()
+        return true
     }
-    fun startClient() {
+
+    fun initClient() : Boolean {
+        try {
+            if (_client == null)
+                _client = SocketChannel.open(hostAddress)
+        } catch (e: Exception) {
+            isRunning = false
+            return false
+        }
+        isRunning = true
+        return true;
+    }
+
+    fun startClient() : Boolean {
+        if(!initClient())
+            return false
+
+        val client = this.getClient()
         client.configureBlocking(false)
         client.register(this.selector, SelectionKey.OP_READ)
-
-        while (true) {
+        while (isRunning) {
             try {
 
                 // wait for events
@@ -92,8 +94,14 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
                 }
             } catch(e: Exception) {
                 println(e)
+                e.printStackTrace()
+                readBuffer = ""
+                bracesDepth = 0
             }
         }
+        client.shutdownInput()
+        client.shutdownOutput()
+        return true
     }
 
     var bracesDepth = 0
@@ -112,16 +120,15 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
 
     private fun processMessage(readBuffer: String) {
         println("New message: " + readBuffer)
-
-
-        var parser = JsonParser()
-        var json = parser.parse(readBuffer)
+        val parser = JsonParser()
+        val json = parser.parse(readBuffer)
         if(json.isJsonObject) {
 
             var obj = json.asJsonObject!!
             if(obj["State"] != null && obj["State"].isJsonPrimitive()) {
-                computeStackFromJson(obj)
-                OnStateChange(obj["State"].asString, obj["File"].asString, obj["Line"].asInt - 1)
+
+                var pos = computeStackFromJson(obj)
+                OnStateChange(obj["State"].asString, pos?.position?.File ?: "", pos?.position?.line ?: 0)
             }
             else if(obj["Request"] != null && obj["Request"].isJsonPrimitive()) {
                 if(evalCallbacks[ obj["Request"].asString ] != null) {
@@ -136,17 +143,23 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
         }
     }
 
-    private fun  computeStackFromJson(obj: JsonObject) {
+    private fun  computeStackFromJson(obj: JsonObject) : CMakeStackFrame? {
         var stack = ArrayList<CMakeStackFrame>()
+        var current : CMakeStackFrame? = null
+
         var bt = obj["Backtrace"]
         if(bt != null && bt.isJsonArray) {
             var arr = bt.asJsonArray
             for (i in arr) {
                 val item = i.asJsonObject
-                stack.add(CMakeStackFrame(this, SourceFilePosition(  item["Line"].asInt - 1, item["File"].asString), item["Name"].asString))
+                var stackFrame = CMakeStackFrame(this, SourceFilePosition(item["Line"].asInt - 1, item["File"].asString), item["Name"].asString)
+                if(current == null)
+                    current = stackFrame
+                stack.add(stackFrame)
             }
             this.stack = CMakeExecutionStack(this, stack)
         }
+        return current
     }
 
     private fun read(key: SelectionKey) {
@@ -167,13 +180,11 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
         OnRead(String(data, UTF8_CHARSET))
     }
 
-    fun step() {
-        sendCommand("Step")
-    }
-
-    fun pause() {
-        sendCommand("Break")
-    }
+    fun pause() = sendCommand("Break")
+    fun resume() = sendCommand("Continue")
+    fun stepOut() = sendCommand( "StepOut" )
+    fun stepInto() = sendCommand( "StepIn" )
+    fun stepOver() = sendCommand( "StepOver" )
 
     private fun sendCommand(cmd : Map<String, out Any>) {
         var obj = JsonObject()
@@ -185,66 +196,42 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
 
         sendString(obj.toString())
     }
-    private fun sendString(cmd: String) {
-        client.write(ByteBuffer.wrap(cmd.toByteArray(Charset.forName("UTF-8"))))
+    private fun sendString(cmd: String) : Boolean {
+        getClient().write(ByteBuffer.wrap(cmd.toByteArray(Charset.forName("UTF-8"))))
         println("Send command: " + cmd)
+        return true
     }
     private fun sendCommand(cmd: String) {
         var cmd = "{ \"Command\": \""+ cmd + "\" }"
-        return sendString(cmd)
-    }
-
-    fun resume() {
-        sendCommand("Continue")
+        sendString(cmd)
     }
 
     fun  connect(indicator: ProgressIndicator, serverProcessHandler: OSProcessHandler, times: Int) {
         serverProcessHandler.startNotify()
         startClientThread()
-    }
-
-    fun  isReady(): Boolean {
-        return true
-    }
-    fun  attach(sourceFiles: Set<SourceFilePosition>) {
-        for (position in sourceFiles) {
-            addBreakPoint(position)
-        }
         resume()
     }
+    fun shutdown() {
+        isRunning = false
+    }
 
-    fun  removeBreakPoint(sourceFile: SourceFilePosition) {
-        sendCommand( mapOf("Command" to "RemoveBreakpoint",
-                "File" to sourceFile.File,
-                "Line" to (sourceFile.myLine + 1)
-        ) )
-    }
-    fun  addBreakPoint(sourceFile: SourceFilePosition) {
-        sendCommand( mapOf("Command" to "AddBreakpoint",
-                "File" to sourceFile.File,
-                "Line" to (sourceFile.myLine + 1)
-                ) )
-    }
+    fun  isReady(): Boolean = isRunning
+
+    fun  removeBreakPoint(sourceFile: SourceFilePosition) =
+            sendCommand( mapOf("Command" to "RemoveBreakpoint",
+            "File" to sourceFile.File,
+            "Line" to (sourceFile.myLine + 1)
+    ) )
+
+    fun  addBreakPoint(sourceFile: SourceFilePosition) =
+            sendCommand( mapOf("Command" to "AddBreakpoint",
+            "File" to sourceFile.File,
+            "Line" to (sourceFile.myLine + 1)
+            ) )
 
     fun  evaluate(str: String, cb: XDebuggerEvaluator.XEvaluationCallback, location: XSourcePosition?) {
         evalCallbacks[str] = cb
         sendCommand( mapOf("Command" to "Evaluate", "Request" to str))
     }
-
-    fun stepOut() {
-        sendCommand( "StepOut" )
-    }
-    fun stepInto() {
-        sendCommand( "StepIn" )
-    }
-    fun stepOver() {
-        sendCommand( "StepOver" )
-    }
 }
 
-class CMakeValue(debugger: CMakeDebuggerProxy, v: String) : XValue() {
-    var value = v
-    override fun computePresentation(node: XValueNode, place: XValuePlace) {
-        node.setPresentation(null, "",  value, false)
-    }
-}

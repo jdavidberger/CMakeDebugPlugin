@@ -1,6 +1,5 @@
 package com.radix.cmake.xdebug
 
-import com.intellij.ide.highlighter.XmlFileType
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.project.Project
@@ -15,7 +14,7 @@ class CMakeDebuggerEditorsProvider : XDebuggerEditorsProvider() {
         return PsiDocumentManager.getInstance(project).getDocument(psiFile)!!
     }
 
-    override fun getFileType(): FileType {
-        return XmlFileType.INSTANCE
-    }
+    override fun getFileType(): FileType =
+            CMakeFileType.INSTANCE
 }
+

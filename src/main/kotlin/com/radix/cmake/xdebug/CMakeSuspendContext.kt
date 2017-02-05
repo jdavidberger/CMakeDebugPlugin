@@ -10,13 +10,11 @@ class CMakeSuspendContext(project: Project, debugProcess: CMakeDebugProcess) : X
     init {
         val debuggerProxy = debugProcess.proxy
         if (debuggerProxy.isReady()) {
-            myExecutionStack = debuggerProxy.stack
+            myExecutionStack = debuggerProxy.GetLastBacktrace()
         }
     }
 
-    override fun getActiveExecutionStack(): XExecutionStack? {
-        return myExecutionStack
-    }
+    override fun getActiveExecutionStack(): XExecutionStack? = myExecutionStack
 
     override fun getExecutionStacks(): Array<XExecutionStack> {
         if(myExecutionStack == null)
