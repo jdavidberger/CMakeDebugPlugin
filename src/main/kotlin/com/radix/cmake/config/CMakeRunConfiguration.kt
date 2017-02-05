@@ -19,7 +19,7 @@ class CMakeRunConfiguration(project: Project, factory: CMakeRunConfigurationFact
         ModuleBasedConfiguration<RunConfigurationModule>(s, RunConfigurationModule(project), factory) {
 
     var cmakePath = "cmake"
-    var port = 8080
+    var port = 4329
     var workingDir = ""
     var sourceDir = ""
 
