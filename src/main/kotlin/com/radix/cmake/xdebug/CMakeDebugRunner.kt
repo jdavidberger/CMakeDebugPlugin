@@ -27,6 +27,10 @@ class CMakeDebugRunner() : GenericProgramRunner <RunnerSettings>() {
         return "CMakeDebugRunner"
     }
 
+    override fun doExecute(state: RunProfileState, environment: ExecutionEnvironment): RunContentDescriptor? {
+        return super.doExecute(state, environment)
+    }
+
     override fun doExecute(project: Project, state: RunProfileState, contentToReuse: RunContentDescriptor?,
                            environment: ExecutionEnvironment): RunContentDescriptor? {
         FileDocumentManager.getInstance().saveAllDocuments()

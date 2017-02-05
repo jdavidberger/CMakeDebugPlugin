@@ -123,7 +123,6 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
         val parser = JsonParser()
         val json = parser.parse(readBuffer)
         if(json.isJsonObject) {
-
             var obj = json.asJsonObject!!
             if(obj["State"] != null && obj["State"].isJsonPrimitive()) {
 

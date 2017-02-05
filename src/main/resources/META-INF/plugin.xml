@@ -1,8 +1,8 @@
 <idea-plugin version="2">
-  <id>com.your.company.unique.plugin.id</id>
+  <id>com.radix.cmake.debugger</id>
   <name>CMake Debugger</name>
   <version>1.0</version>
-  <vendor email="j.david.berger@gmail.com" url="http://www.yourcompany.com">Radix Mons</vendor>
+  <vendor email="j.david.berger@gmail.com" url="http://monsradix.com/">Mons Radix</vendor>
 
   <description><![CDATA[
       This plug-in allows you to debug cmake scripts
@@ -15,6 +15,7 @@
   <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html
        on how to target different products -->
   <depends>com.intellij.modules.lang</depends>
+  <depends>com.intellij.modules.xdebugger</depends>
 
   <extensions defaultExtensionNs="com.intellij">
     <configurationType implementation="com.radix.cmake.config.CMakeConfigType"/>

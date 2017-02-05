@@ -32,7 +32,9 @@ class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
     init {
         proxy.AddListener(this)
         serverProcessHandler.addProcessListener(this)
+        session.setPauseActionSupported(true)
     }
+
 
     override fun getEditorsProvider(): XDebuggerEditorsProvider = CMakeDebuggerEditorsProvider()
 
@@ -56,7 +58,6 @@ class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
                 } catch (e: Exception) {
                     terminateDebug(e.message)
                 }
-
             }
         })
     }
@@ -98,6 +99,10 @@ class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
     override fun getBreakpointHandlers(): Array<out XBreakpointHandler<*>> =
             arrayOf<XBreakpointHandler<*>>(myLineBreakpointHandler)
 
+    override fun checkCanPerformCommands(): Boolean {
+        return super.checkCanPerformCommands()
+    }
+
     override fun OnStateChange(newState: String, file: String, line: Int) {
         val bp = SourceFilePosition(line, file)
         val xBreakpoint = myLineBreakpointHandler.myBreakpointByPosition[bp]
@@ -123,6 +128,7 @@ class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
     override fun processTerminated(event: ProcessEvent?) {
         processHandler.destroyProcess()
         proxy.shutdown()
+        session.stop()
         session.stop()
     }
 
