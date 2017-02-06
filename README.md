@@ -7,6 +7,10 @@
 1. Run `gradle build`, observe success
 1. Run `gradle runIdea` to launch a sand box Intellij IDE
 
+## Get pre-built binaries
+
+[They are available here](https://github.com/jdavidberger/CMakeDebugPlugin/releases)
+
 ## Installation from zip
 
 Go into 'Settings' -> 'Plugins' -> 'Install plugin from disk...' and find the plugin zip file. This will require a restart of the IDE. 
