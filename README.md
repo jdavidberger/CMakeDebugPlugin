@@ -20,3 +20,7 @@ On the configuration panel, only modify the port if you have a conflict with som
 Modify the 'CMake Installation' option to point to a version of CMake with the integrated debugger. You can get binaries [here](https://github.com/jdavidberger/CMake/releases). You can build from source from [here](https://github.com/jdavidberger/CMake/tree/debugger). If you don't do this, the plugin will crash.
 
 You can set the build and source directory to wherever the project you want to build is. If you leave them empty, you'll get reasonable defaults -- the source directory will be the project root, and the build directory will be a build folder hanging off of that folder. 
+
+After that, select your newly configured configuration and hit the normal 'debug' button. This should start into the normal debug mode. Note that the plugin also gives you the ability to set breakpoints in CMake files. 
+
+'Add watch' can be used to display variables like in most other languages -- so CMAKE_GENERATOR would show you the current generator. You can also put a string into the watch to have it evaluate the string as CMAKE would. So if you added "${CMAKE_GENERATOR} ${CMAKE_CURRENT_SOURCE_DIR}" it would evaluate that as if you sent it to MESSAGE. This can be arbitrarily nested; basically anything you can put in MESSAGE should show up here. 
