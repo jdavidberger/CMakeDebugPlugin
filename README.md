@@ -11,13 +11,17 @@
 
 Go into 'Settings' -> 'Plugins' -> 'Install plugin from disk...' and find the plugin zip file. This will require a restart of the IDE. 
 
+## Get a version of CMake with the debugger feature
+
+You can get binaries [here](https://github.com/jdavidberger/CMake/releases). You can build from source from [here](https://github.com/jdavidberger/CMake/tree/debugger). The plugin requires a version of CMake with the debugger integrated to work. 
+
 ## Usage
 
 After installation, go into 'Edit Configurations', click the '+' button in the top left and add the 'CMake' application type (you might have to click to show more options in the dropdown). 
 
 On the configuration panel, only modify the port if you have a conflict with something else running on your system. 
 
-Modify the 'CMake Installation' option to point to a version of CMake with the integrated debugger. You can get binaries [here](https://github.com/jdavidberger/CMake/releases). You can build from source from [here](https://github.com/jdavidberger/CMake/tree/debugger). If you don't do this, the plugin will crash.
+Modify the 'CMake Installation' option to point to a version of CMake with the integrated debugger. 
 
 You can set the build and source directory to wherever the project you want to build is. If you leave them empty, you'll get reasonable defaults -- the source directory will be the project root, and the build directory will be a build folder hanging off of that folder. 
 
