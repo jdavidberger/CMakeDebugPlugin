@@ -21,7 +21,7 @@ class CMakeProcessFactory {
         if(!File(workingdir).exists())
             File(workingdir).mkdir()
 
-        result.exePath = config.cmakePath
+        result.exePath = "C:/Windows/System32/PING.EXE" //config.cmakePath
 
         result.setWorkDirectory( workingdir )
         result.addParameter("--debugger=" + config.port)
