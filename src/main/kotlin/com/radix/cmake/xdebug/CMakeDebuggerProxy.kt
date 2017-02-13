@@ -54,11 +54,12 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
             if (_client == null)
                 _client = SocketChannel.open(hostAddress)
         } catch (e: Exception) {
+            e.printStackTrace()
             isRunning = false
             return false
         }
         isRunning = true
-        return true;
+        return true
     }
 
     fun startClient() : Boolean {
@@ -208,7 +209,7 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
     fun  connect(indicator: ProgressIndicator, serverProcessHandler: OSProcessHandler, times: Int) {
         serverProcessHandler.startNotify()
         startClientThread()
-        resume()
+        //resume()
     }
     fun shutdown() {
         isRunning = false
@@ -224,7 +225,7 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
 
     fun  addBreakPoint(sourceFile: SourceFilePosition) =
             sendCommand( mapOf("Command" to "AddBreakpoint",
-            "File" to sourceFile.File,
+            "File" to sourceFile.File.replace("\\", "/"),
             "Line" to (sourceFile.myLine + 1)
             ) )
 

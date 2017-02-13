@@ -65,7 +65,6 @@ class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
     override fun doGetProcessHandler(): ProcessHandler? = serverProcessHandler
 
     override fun stop() {
-        super.stop()
         processHandler.destroyProcess()
         proxy.shutdown()
     }
