@@ -5,10 +5,10 @@ import com.intellij.xdebugger.breakpoints.XBreakpointProperties
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint
 import java.util.*
 
-class CMakeLineBreakpointHandler(debugProcess : CMakeDebugProcess) :
+class CMakeLineBreakpointHandler(debugProcessHost: CMakeDebugProcess) :
         XBreakpointHandler<XLineBreakpoint<XBreakpointProperties<*>>>(CMakeBreakpointType::class.java)
 {
-    private val myDebugProcess = debugProcess
+    private val myDebugProcess = debugProcessHost
     var myBreakpointByPosition = HashMap<SourceFilePosition, XLineBreakpoint<*>>()
 
     override fun unregisterBreakpoint(xBreakpoint: XLineBreakpoint<XBreakpointProperties<*>>, temporary: Boolean) {

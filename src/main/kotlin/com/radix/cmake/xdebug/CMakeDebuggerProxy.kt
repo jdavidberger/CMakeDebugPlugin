@@ -1,9 +1,11 @@
 package com.radix.cmake.xdebug
 
 import com.fasterxml.jackson.core.JsonFactory
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.intellij.execution.process.OSProcessHandler
+import com.intellij.execution.process.ProcessInfo
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.xdebugger.XSourcePosition
 import com.intellij.xdebugger.evaluation.XDebuggerEvaluator
@@ -18,20 +20,21 @@ import java.nio.charset.Charset
 import java.util.*
 
 
-class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
-    private val selector = Selector.open()
-    private val myPort: Int = debugPort
-    private val hostAddress = InetSocketAddress("localhost", myPort)
+class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub(), JsonServerListener {
+    var server = JsonServerWEvents(this)
+
+    private var myPort: Int = debugPort
+    private var hostAddress = InetSocketAddress("localhost", myPort)
     private var _client: SocketChannel? = null
 
     fun getClient() : SocketChannel {
         initClient()
         return _client!!
     }
+
     private var stack = CMakeExecutionStack(this)
     private val jsonFactory = JsonFactory()
     private var evalCallbacks = HashMap<String, XDebuggerEvaluator.XEvaluationCallback>()
-    private var isRunning = true
 
     fun GetLastBacktrace() : CMakeExecutionStack =
             stack
@@ -40,98 +43,33 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
     fun startClientThread() : Boolean {
         if(!initClient())
             return false
-        val t = object : Thread() {
-            override fun run() {
-                startClient()
-            }
-        }
-        t.start()
+
+        server.startThread()
         return true
     }
 
     fun initClient() : Boolean {
         try {
-            if (_client == null)
-                _client = SocketChannel.open(hostAddress)
+            if (_client == null) {
+                _client = SocketChannel.open(InetSocketAddress("localhost", myPort))
+                server.addSocket(_client!!)
+            }
         } catch (e: Exception) {
-            e.printStackTrace()
-            isRunning = false
-            return false
+                server.isRunning = false
+                return false
         }
-        isRunning = true
         return true
     }
 
-    fun startClient() : Boolean {
-        if(!initClient())
-            return false
-
-        val client = this.getClient()
-        client.configureBlocking(false)
-        client.register(this.selector, SelectionKey.OP_READ)
-        while (isRunning) {
-            try {
-
-                // wait for events
-                this.selector.select()
-
-                //work on selected keys
-                val keys = this.selector.selectedKeys().iterator()
-                while (keys.hasNext()) {
-                    val key = keys.next()
-
-                    // this is necessary to prevent the same key from coming up
-                    // again the next time around.
-                    // keys.remove()
-
-                    if (!key.isValid) {
-                        continue
-                    }
-
-                    if (key.isReadable) {
-                        this.read(key)
-                    }
-
-                }
-            } catch(e: Exception) {
-                println(e)
-                e.printStackTrace()
-                readBuffer = ""
-                bracesDepth = 0
-            }
-        }
-        client.shutdownInput()
-        client.shutdownOutput()
-        return true
-    }
-
-    var bracesDepth = 0
-    var readBuffer = ""
-    private fun OnRead(data : String) {
-        for( c : Char in data) {
-            if(c == '{') bracesDepth++
-            if(c == '}') bracesDepth--
-            readBuffer += c
-            if(bracesDepth == 0) {
-                processMessage(readBuffer)
-                readBuffer = ""
-            }
-        }
-    }
-
-    private fun processMessage(readBuffer: String) {
-        println("New message: " + readBuffer)
-        val parser = JsonParser()
-        val json = parser.parse(readBuffer)
-        if(json.isJsonObject) {
+    override fun processMessage(key: SelectionKey, json: JsonElement) {
+        if (json.isJsonObject) {
             var obj = json.asJsonObject!!
-            if(obj["State"] != null && obj["State"].isJsonPrimitive()) {
-
+            println(obj.toString())
+            if (obj["State"] != null && obj["State"].isJsonPrimitive()) {
                 var pos = computeStackFromJson(obj)
                 OnStateChange(obj["State"].asString, pos?.position?.File ?: "", pos?.position?.line ?: 0)
-            }
-            else if(obj["Request"] != null && obj["Request"].isJsonPrimitive()) {
-                if(evalCallbacks[ obj["Request"].asString ] != null) {
+            } else if (obj["Request"] != null && obj["Request"].isJsonPrimitive()) {
+                if (evalCallbacks[obj["Request"].asString] != null) {
                     if (obj["Response"].isJsonPrimitive)
                         evalCallbacks[obj["Request"].asString]?.evaluated(CMakeValue(this, obj["Response"].asString))
                     else
@@ -162,31 +100,13 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
         return current
     }
 
-    private fun read(key: SelectionKey) {
-        val channel = key.channel() as SocketChannel
-        val buffer = ByteBuffer.allocate(1024)
-        var numRead = -1
-        numRead = channel.read(buffer)
-
-        if (numRead == -1) {
-            val socket = channel.socket()
-            channel.close()
-            key.cancel()
-            return
-        }
-
-        val data = ByteArray(numRead)
-        System.arraycopy(buffer.array(), 0, data, 0, numRead)
-        OnRead(String(data, UTF8_CHARSET))
-    }
-
     fun pause() = sendCommand("Break")
     fun resume() = sendCommand("Continue")
     fun stepOut() = sendCommand( "StepOut" )
     fun stepInto() = sendCommand( "StepIn" )
     fun stepOver() = sendCommand( "StepOver" )
 
-    private fun sendCommand(cmd : Map<String, out Any>) {
+    private fun sendCommand(cmd : Map<String, Any>) {
         var obj = JsonObject()
         for(k in cmd)
             if(k.value is Int)
@@ -201,25 +121,29 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
         println("Send command: " + cmd)
         return true
     }
-    private fun sendCommand(cmd: String) {
-        var cmd = "{ \"Command\": \""+ cmd + "\" }"
+    private fun sendCommand(cmdId: String) {
+        var cmd = "{ \"Command\": \""+ cmdId + "\" }"
         sendString(cmd)
     }
 
     fun  connect(indicator: ProgressIndicator, serverProcessHandler: OSProcessHandler, times: Int) {
         serverProcessHandler.startNotify()
         startClientThread()
-        //resume()
     }
-    fun shutdown() {
-        isRunning = false
+    fun  connect(indicator: ProgressIndicator, times: Int) {
+        startClientThread()
+        pause()
     }
 
-    fun  isReady(): Boolean = isRunning
+    fun shutdown() {
+        server.isRunning = false
+    }
+
+    fun  isReady(): Boolean = server.isRunning
 
     fun  removeBreakPoint(sourceFile: SourceFilePosition) =
             sendCommand( mapOf("Command" to "RemoveBreakpoint",
-            "File" to sourceFile.File,
+            "File" to sourceFile.File.replace("\\", "/"),
             "Line" to (sourceFile.myLine + 1)
     ) )
 
@@ -232,6 +156,11 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub() {
     fun  evaluate(str: String, cb: XDebuggerEvaluator.XEvaluationCallback, location: XSourcePosition?) {
         evalCallbacks[str] = cb
         sendCommand( mapOf("Command" to "Evaluate", "Request" to str))
+    }
+
+    constructor(client: SocketChannel) : this(0) {
+        _client = client
+        server.addSocket(_client!!)
     }
 }
 

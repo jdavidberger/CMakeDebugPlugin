@@ -45,7 +45,7 @@ class CMakeDebugRunner() : GenericProgramRunner <RunnerSettings>() {
                 object : XDebugProcessStarter() {
             @NotNull
             override fun start(@NotNull session: XDebugSession): XDebugProcess {
-                return CMakeDebugProcess(session, state, serverProcessHandler, debuggerProxy)
+                return CMakeDebugProcessHost(session, state, serverProcessHandler, debuggerProxy)
             }
         })
         return session.runContentDescriptor

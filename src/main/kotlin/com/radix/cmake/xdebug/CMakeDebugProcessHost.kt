@@ -19,25 +19,18 @@ import com.intellij.xdebugger.frame.XSuspendContext
 import com.radix.cmake.config.CMakeRunCommandLineState
 import javax.swing.SwingUtilities.invokeLater
 
-
-class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
-                        serverProcessHandler: OSProcessHandler,
-                        proxy : CMakeDebuggerProxy) : XDebugProcess(session), CMakeDebuggerListener, ProcessListener {
-
-
-    private val serverProcessHandler = serverProcessHandler
-    val proxy = proxy
-    val myLineBreakpointHandler = CMakeLineBreakpointHandler(this)
+open class CMakeDebugProcess(session: XDebugSession,
+                             proxy : CMakeDebuggerProxy) : XDebugProcess(session), CMakeDebuggerListener {
 
     init {
         proxy.AddListener(this)
-        serverProcessHandler.addProcessListener(this)
         session.setPauseActionSupported(true)
     }
 
 
+    val proxy = proxy
+    val myLineBreakpointHandler = CMakeLineBreakpointHandler(this)
     override fun getEditorsProvider(): XDebuggerEditorsProvider = CMakeDebuggerEditorsProvider()
-
     override fun sessionInitialized() {
         super.sessionInitialized()
 
@@ -47,7 +40,7 @@ class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
                 indicator.isIndeterminate = true
 
                 try {
-                    proxy.connect(indicator, serverProcessHandler, 60)
+                    proxy.connect(indicator, 60)
 
                     if (!proxy.isReady()) {
                         terminateDebug(null)
@@ -62,28 +55,16 @@ class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
         })
     }
 
-    override fun doGetProcessHandler(): ProcessHandler? = serverProcessHandler
-
     override fun stop() {
         processHandler.destroyProcess()
         proxy.shutdown()
     }
 
-    private fun terminateDebug(msg: String?) {
-        processHandler.destroyProcess()
+    open fun terminateDebug(msg: String?) {
         invokeLater({
             val text = "Debugger can't connect to CMake"
             Messages.showErrorDialog(if (msg != null) text + ":\r\n" + msg else text, "CMake debugger")
         })
-    }
-
-    override fun createConsole(): ExecutionConsole {
-        val consoleBuilder = TextConsoleBuilderFactory.getInstance().createBuilder(session.project)
-
-        val console = consoleBuilder.console
-        console.attachToProcess(serverProcessHandler)
-
-        return console
     }
 
     override fun resume(context: XSuspendContext?) = proxy.resume()
@@ -91,10 +72,8 @@ class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
     override fun startStepOver(context: XSuspendContext?) = proxy.stepOver()
     override fun startStepOut(context: XSuspendContext?) = proxy.stepOut()
     override fun startStepInto(context: XSuspendContext?) = proxy.stepInto()
-
     fun removeBreakPoint(sourceFile: SourceFilePosition) = proxy.removeBreakPoint(sourceFile)
     fun addBreakPoint(sourceFile: SourceFilePosition) = proxy.addBreakPoint(sourceFile)
-
     override fun getBreakpointHandlers(): Array<out XBreakpointHandler<*>> =
             arrayOf<XBreakpointHandler<*>>(myLineBreakpointHandler)
 
@@ -120,16 +99,15 @@ class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
         }
     }
 
-    override fun onTextAvailable(event: ProcessEvent?, outputType: Key<*>?) {
+    fun onTextAvailable(event: ProcessEvent?, outputType: Key<*>?) {
 
     }
 
-    override fun processTerminated(event: ProcessEvent?) {
-        processHandler.destroyProcess()
-        proxy.shutdown()
-        session.stop()
-        session.stop()
-    }
+}
+
+class CMakeDebugProcessHost(session: XDebugSession, state: CMakeRunCommandLineState,
+                            serverProcessHandler: OSProcessHandler,
+                            proxy : CMakeDebuggerProxy) : CMakeDebugProcess(session, proxy), ProcessListener {
 
     override fun processWillTerminate(event: ProcessEvent?, willBeDestroyed: Boolean) {
 
@@ -138,6 +116,60 @@ class CMakeDebugProcess(session: XDebugSession, state: CMakeRunCommandLineState,
     override fun startNotified(event: ProcessEvent?) {
 
     }
+
+    override fun terminateDebug(msg: String?) {
+        processHandler.destroyProcess()
+        super.terminateDebug(msg)
+    }
+
+    private val serverProcessHandler = serverProcessHandler
+
+    init {
+        serverProcessHandler.addProcessListener(this)
+    }
+
+    override fun sessionInitialized() {
+        super.sessionInitialized()
+
+        ProgressManager.getInstance().run(object : Task.Backgroundable(null, "CMake debugger", true) {
+            override fun run(indicator: ProgressIndicator) {
+                indicator.text = "Connecting..."
+                indicator.isIndeterminate = true
+
+                try {
+                    proxy.connect(indicator, serverProcessHandler, 60)
+
+                    if (!proxy.isReady()) {
+                        terminateDebug(null)
+                    }
+
+                    indicator.text = "Connected"
+                    indicator.isIndeterminate = false
+                } catch (e: Exception) {
+                    terminateDebug(e.message)
+                }
+            }
+        })
+    }
+
+
+    override fun doGetProcessHandler(): ProcessHandler? = serverProcessHandler
+
+    override fun processTerminated(event: ProcessEvent?) {
+        processHandler.destroyProcess()
+        proxy.shutdown()
+        session.stop()
+    }
+
+    override fun createConsole(): ExecutionConsole {
+        val consoleBuilder = TextConsoleBuilderFactory.getInstance().createBuilder(session.project)
+
+        val console = consoleBuilder.console
+        console.attachToProcess(serverProcessHandler)
+
+        return console
+    }
+
 }
 
 

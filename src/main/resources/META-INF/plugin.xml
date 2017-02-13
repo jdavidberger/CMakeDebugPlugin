@@ -21,7 +21,7 @@
     <configurationType implementation="com.radix.cmake.config.CMakeConfigType"/>
 
     <xdebugger.breakpointType implementation="com.radix.cmake.xdebug.CMakeBreakpointType"/>
-
+    <xdebugger.localAttachDebuggerProvider implementation="com.radix.cmake.xdebug.LocalAttachDebugger"/>
     <programRunner implementation="com.radix.cmake.xdebug.CMakeDebugRunner"/>
 
   </extensions>

@@ -4,11 +4,11 @@ import com.intellij.openapi.project.Project
 import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XSuspendContext
 
-class CMakeSuspendContext(project: Project, debugProcess: CMakeDebugProcess) : XSuspendContext() {
+class CMakeSuspendContext(project: Project, debugProcessHost: CMakeDebugProcess) : XSuspendContext() {
     private var myExecutionStack: CMakeExecutionStack? = null
 
     init {
-        val debuggerProxy = debugProcess.proxy
+        val debuggerProxy = debugProcessHost.proxy
         if (debuggerProxy.isReady()) {
             myExecutionStack = debuggerProxy.GetLastBacktrace()
         }
