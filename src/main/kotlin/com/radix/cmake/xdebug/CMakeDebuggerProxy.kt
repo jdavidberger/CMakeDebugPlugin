@@ -56,6 +56,7 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub(), JsonServe
             }
         } catch (e: Exception) {
                 server.isRunning = false
+            e.printStackTrace()
                 return false
         }
         return true
@@ -117,7 +118,10 @@ class CMakeDebuggerProxy(debugPort: Int) : CMakeDebuggerListenerHub(), JsonServe
         sendString(obj.toString())
     }
     private fun sendString(cmd: String) : Boolean {
-        getClient().write(ByteBuffer.wrap(cmd.toByteArray(Charset.forName("UTF-8"))))
+        var sendCmd = "[== \"CMake Server\" ==[\n" + cmd +
+                "\n]== \"CMake Server\" ==]\n"
+
+        getClient().write(ByteBuffer.wrap(sendCmd.toByteArray(Charset.forName("UTF-8"))))
         println("Send command: " + cmd)
         return true
     }

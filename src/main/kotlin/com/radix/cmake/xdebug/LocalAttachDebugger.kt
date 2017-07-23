@@ -82,7 +82,7 @@ class CMakeLocalAttachDebugger(processInfo: ProcessInfo) : XLocalAttachDebugger 
 
 abstract class JsonServer {
     private val selector = Selector.open()
-    private var _isRunning = true
+    private var _isRunning = false
     var isRunning: Boolean
         get() = _isRunning
         set(value) {
@@ -132,10 +132,25 @@ abstract class JsonServer {
             if(c == '}') bracesDepth--
             readBuffer += c
             if(bracesDepth == 0) {
-                val parser = JsonParser()
-                val json = parser.parse(readBuffer)
-                if(json!=null)
-                    processMessage(key, json!!)
+                if(readBuffer.startsWith("[== \"CMake Server\" ==[\n")) {
+                    readBuffer = readBuffer.substring("[== \"CMake Server\" ==[\n".length)
+                }
+                if(readBuffer.endsWith("]== \"CMake Server\" ==]")) {
+                    readBuffer = readBuffer.substring(0, readBuffer.length - "]== \"CMake Server\" ==]".length).toString()
+                }
+                readBuffer = readBuffer.trim()
+
+                try {
+                    if(readBuffer.isNotEmpty() && readBuffer[0] == '{') {
+                        val parser = JsonParser()
+                            val json = parser.parse(readBuffer)
+                            if (json != null)
+                                processMessage(key, json!!)
+                    }
+                } catch (e: Exception) {
+                    print(e)
+                    readBuffer = ""
+                }
                 readBuffer = ""
             }
         }
@@ -144,6 +159,9 @@ abstract class JsonServer {
     abstract fun  processMessage(key: SelectionKey, json: JsonElement)
 
     fun start() : Boolean {
+        if(isRunning)
+            return false
+        isRunning = true
         while (isRunning) {
             try {
                 // wait for events

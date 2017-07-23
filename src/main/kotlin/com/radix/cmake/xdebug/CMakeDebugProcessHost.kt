@@ -11,6 +11,7 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.Key
+import com.intellij.util.WaitFor
 import com.intellij.xdebugger.XDebugProcess
 import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler
@@ -38,13 +39,9 @@ open class CMakeDebugProcess(session: XDebugSession,
             override fun run(indicator: ProgressIndicator) {
                 indicator.text = "Connecting..."
                 indicator.isIndeterminate = true
-
+                Thread.sleep(1000)
                 try {
                     proxy.connect(indicator, 60)
-
-                    if (!proxy.isReady()) {
-                        terminateDebug(null)
-                    }
 
                     indicator.text = "Connected"
                     indicator.isIndeterminate = false
@@ -63,7 +60,7 @@ open class CMakeDebugProcess(session: XDebugSession,
     open fun terminateDebug(msg: String?) {
         invokeLater({
             val text = "Debugger can't connect to CMake"
-            Messages.showErrorDialog(if (msg != null) text + ":\r\n" + msg else text, "CMake debugger")
+             Messages.showErrorDialog(if (msg != null) text + ":\r\n" + msg else text, "CMake debugger")
         })
     }
 
@@ -138,10 +135,6 @@ class CMakeDebugProcessHost(session: XDebugSession, state: CMakeRunCommandLineSt
 
                 try {
                     proxy.connect(indicator, serverProcessHandler, 60)
-
-                    if (!proxy.isReady()) {
-                        terminateDebug(null)
-                    }
 
                     indicator.text = "Connected"
                     indicator.isIndeterminate = false
